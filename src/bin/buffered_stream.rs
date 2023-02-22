@@ -1,24 +1,36 @@
 use futures::StreamExt;
-
-struct Processed {
-    value: String,
-}
+use rand::Rng;
+use tokio::sync::mpsc;
 
 #[derive(Debug)]
 struct Work {
-    value: String,
+    request: String,
+}
+
+#[derive(Debug)]
+struct Result {
+    response: String,
+}
+
+async fn do_work(work: Work) -> Result {
+    let rng = rand::thread_rng().gen_range(500..1500);
+    tokio::time::sleep(std::time::Duration::from_millis(rng)).await;
+
+    Result {
+        response: format!("{}_processed", work.request),
+    }
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let (tx_work, rx_work) = tokio::sync::mpsc::channel(100);
+    let (tx_work, rx_work) = mpsc::channel(1);
 
     let consumer = tokio::spawn(consumer(rx_work));
 
     for idx in 0..20 {
         tx_work
             .send(Work {
-                value: format!("work_{}", idx),
+                request: format!("work_{}", idx),
             })
             .await?;
     }
@@ -29,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn consumer(mut incoming: tokio::sync::mpsc::Receiver<Work>) {
+async fn consumer(mut incoming: mpsc::Receiver<Work>) {
     let stream = async_stream::stream! {
         while let Some(item) = incoming.recv().await {
             yield do_work(item);
@@ -40,16 +52,6 @@ async fn consumer(mut incoming: tokio::sync::mpsc::Receiver<Work>) {
     futures::pin_mut!(queue);
 
     while let Some(result) = queue.next().await {
-        println!("{}_processed", result.value);
-    }
-
-    ()
-}
-
-async fn do_work(work: Work) -> Processed {
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-
-    Processed {
-        value: format!("{}_processed", work.value),
+        println!("{}_processed", result.response);
     }
 }

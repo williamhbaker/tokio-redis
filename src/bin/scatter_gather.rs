@@ -10,8 +10,8 @@ struct Result {
 }
 
 async fn do_work(work: Work) -> Result {
-    let mut rng = rand::thread_rng();
-    tokio::time::sleep(std::time::Duration::from_millis(rng.gen_range(500..1500))).await;
+    let rng = rand::thread_rng().gen_range(500..1500);
+    tokio::time::sleep(std::time::Duration::from_millis(rng)).await;
 
     Result {
         response: format!("{}_processed", work.request),

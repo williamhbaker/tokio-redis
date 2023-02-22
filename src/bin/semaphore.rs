@@ -1,18 +1,25 @@
 use std::sync::Arc;
 
-use tokio::{
-    sync::{mpsc, Semaphore},
-    time,
-};
+use rand::Rng;
+use tokio::sync::{mpsc, Semaphore};
 
 #[derive(Debug)]
 struct Work {
-    message: String,
+    request: String,
 }
 
 #[derive(Debug)]
 struct Result {
-    message: String,
+    response: String,
+}
+
+async fn do_work(work: Work) -> Result {
+    let rng = rand::thread_rng().gen_range(500..1500);
+    tokio::time::sleep(std::time::Duration::from_millis(rng)).await;
+
+    Result {
+        response: format!("{}_processed", work.request),
+    }
 }
 
 #[tokio::main]
@@ -24,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(producer(tx_work));
 
     while let Some(result) = rx_result.recv().await {
-        println!("got result: {}", result.message);
+        println!("{}", result.response);
     }
 
     Ok(())
@@ -34,7 +41,7 @@ async fn producer(tx_work: mpsc::Sender<Work>) {
     for idx in 0..20 {
         tx_work
             .send(Work {
-                message: format!("message_{}", idx),
+                request: format!("work_{}", idx),
             })
             .await
             .unwrap();
@@ -57,12 +64,4 @@ async fn worker(
     }
 
     Ok(())
-}
-
-async fn do_work(work: Work) -> Result {
-    time::sleep(std::time::Duration::from_millis(300)).await;
-
-    Result {
-        message: format!("{}_processed", work.message),
-    }
 }
